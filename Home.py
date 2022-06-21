@@ -46,6 +46,26 @@ def sum_data(df):
         sum_df = sum_df.append( { 'Player' : player, 'Holes Played': played, 'Total Points': points }, ignore_index=True )
     return sum_df
 
+def getfname( chart, var, filters=None, split=None ):
+    chart_map = { 'Histogram': 'hist', 'Pie Chart': 'pie' }
+    chartname = chart_map[chart]
+    varname = ''.join( [ f'{el[0]}{el[-1]}' for el in var.split() ] )
+    filtname = ''
+    if filters is not None:
+        if len(filters)>0:
+            filtname = '_'
+            for filt in filters:
+                for key, lst in filt.items():
+                    filtname += key
+                    for l in lst:
+                        filtname += ''.join( [ f'{el[0]}' for el in l.split() ] )
+    splitname = ''
+    if split is not None:
+        splitname = '_' + ''.join( [ f'{el[0]}{el[-1]}' for el in split.split() ] )
+
+
+    return f'{chartname}_{varname}{filtname}{splitname}.png'
+
 
 st.title('GASH Cup 2022 Data Analysis')
 
@@ -96,10 +116,16 @@ if chart_option == 'Histogram':
         legend = st.checkbox('Legend?', value=True)
     fig = plot_hist(df, col_option, filters=filters, split=split_by, stacked=stack, legend=legend)
 elif chart_option == 'Pie Chart':
+    split_by = None
     fig = plot_pie_chart(df, col_option, filters=filters)
 
-fig.savefig('testfig.png')
+fname = getfname(chart_option, col_option, filters=filters, split=split_by)
+print(fname)
+fig.savefig(fname)
 st.pyplot(fig)
+
+with open(fname,'rb') as f:
+    st.download_button('Download',data=f,file_name=fname,mime="image/png")
 
 st.subheader('Raw Data')
 st.write(df)
