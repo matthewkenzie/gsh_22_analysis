@@ -36,6 +36,17 @@ def read_data(drop_nan=True):
 
     return df
 
+@st.cache
+def sum_data(df):
+    players = pd.unique( df['Player'] )
+    sum_df = pd.DataFrame( columns=['Player','Holes Played', 'Total Points'] )
+    for player in players:
+        played = len( df[ df['Player']==player ] )
+        points = df[ df['Player']==player ]['Points'].sum()
+        sum_df = sum_df.append( { 'Player' : player, 'Holes Played': played, 'Total Points': points }, ignore_index=True )
+    return sum_df
+
+
 st.title('GASH Cup 2022 Data Analysis')
 
 #data_load_state = st.text('Loading data...       (hit R to refresh)')
@@ -43,15 +54,19 @@ st.text('Data is cached for performance (hit R to refresh)')
 
 df = read_data()
 
+sum_df = sum_data(df)
+
+#st.write(sum_df)
+
 #data_load_state.text('Loading data... done! (hit R to refresh)')
 
 ### DATA STUFF HERE ###
 
 col1, col2 = st.columns(2)
 with col1:
-    chart_option = st.selectbox('Select type of plot', ('Histogram','Pie Chart'))
+    chart_option = st.selectbox('Select type of plot', ('Histogram','Pie Chart'), index=1)
 with col2:
-    col_option = st.selectbox('Select variable to plot', ('Gross Score','Net Score', 'Gross Shots', 'Net Shots','Stableford Points','Hole') )
+    col_option = st.selectbox('Select variable to plot', ('Gross Score','Net Score', 'Gross Shots', 'Net Shots','Stableford Points','Hole'), index=0 )
     col_option = col_option.replace('Stableford Points','Points')
 
 fcol1, fcol2, fcol3 = st.columns(3)
