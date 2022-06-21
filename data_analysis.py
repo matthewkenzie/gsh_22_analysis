@@ -10,7 +10,7 @@ def data_mapper(vals):
 
     map_dict = {}
 
-    if 'Par' in unique or 'Birdie' in unique or 'Bogey' in unique or 'Double Bogey' in unique:
+    if np.any( np.isin( ['Par','Birdie','Bogey','Double Bogey'], unique ) ):
         order = [ 'Albatros', 'Eagle', 'Birdie', 'Par', 'Bogey', 'Double Bogey', 'Triple Bogey', 'Blob' ]
     else:
         order = list(unique)

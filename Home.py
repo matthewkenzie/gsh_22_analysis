@@ -98,6 +98,7 @@ if chart_option == 'Histogram':
 elif chart_option == 'Pie Chart':
     fig = plot_pie_chart(df, col_option, filters=filters)
 
+fig.savefig('testfig.png')
 st.pyplot(fig)
 
 st.subheader('Raw Data')
