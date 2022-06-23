@@ -103,7 +103,7 @@ def plot_hist(df, column, filters=None, split=None, stacked=False, legend=True, 
     fig = plt.gcf()
     return fig
 
-def plot_pie_chart(df, column, filters=None, ax=None):
+def plot_pie_chart(df, column, filters=None, split=None, ax=None):
 
     if column not in df.columns:
         return
@@ -128,13 +128,29 @@ def plot_pie_chart(df, column, filters=None, ax=None):
 
     vals = data[column].values
     vals, xlabels, map_dict = data_mapping(vals)
-    nh, xe = np.histogram( vals, bins=len(xlabels), range=(0,len(xlabels)) )
 
-    mask = nh!=0
-    nh = nh[mask]
-    xlabels = np.array(xlabels)[mask]
+    if split is None:
+        vals = [ vals ]
 
-    ax.pie(nh,labels=xlabels, autopct='%1.1f%%')
+    else:
+        if split in df.columns:
+            labels = np.unique( data[split].values )
+
+            vals = [ np.vectorize(map_dict.get)(data[ data[split]==label ][column].values) for label in labels]
+
+    nval = len(vals)
+    size = 1./nval
+    #radii = np.linspace(0,1,nval+1)[1:]
+    #for rad, val in zip(radii,vals):
+    for i, val in enumerate(vals):
+        nh, xe = np.histogram( val, bins=len(xlabels), range=(0,len(xlabels)) )
+        mask = nh!=0
+        nh = nh[mask]
+        xlabels = np.array(xlabels)[mask]
+        xlabels = [ f'{xlabel} ({val})' for xlabel, val in zip(xlabels, nh) ]
+        wedges, texts, pcts = ax.pie(nh, labels=xlabels, autopct='%1.1f%%', wedgeprops=dict(width=size, edgecolor='w'))
+        for wedge, text in zip(wedges,texts):
+            text.set_color( wedge.get_facecolor() )
 
     column = column.replace('Points','Stableford Points')
     ax.set_title(column)
