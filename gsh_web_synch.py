@@ -104,7 +104,7 @@ def make_charts(df):
 
                 if player == 'All' and variable == 'Player':
                     for score in ['Blob','Eagle','Birdie','Par','Bogey','Double Bogey','Triple Bogey']:
-                        filters['Net Score'] = [ score ]
+                        filters['Gross Score'] = [ score ]
                         pname = save_pie(df, variable, filters=filters)
                         out_df = out_df.append( {**row, **{'Chart': f'Pie Chart {score}s', 'Image': head_url+pname}}, ignore_index=True )
                         upload_fs.append(pname)
