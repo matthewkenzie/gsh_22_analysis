@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from paramiko import SSHClient
+from paramiko import SSHClient, AutoAddPolicy
 from cryptography.fernet import Fernet
 from data_analysis import plot_hist, plot_pie_chart
 from gsh_web_app import read_data, getfname
@@ -15,6 +15,7 @@ def upload(fnames, mkdirs=False):
     password = fernet.decrypt( st.secrets['encode'].encode() ).decode()
     ssh = SSHClient()
     ssh.load_system_host_keys()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect('lxplus.cern.ch',username=st.secrets['user'], password=password)
     remote = '/eos/user/m/mkenzie/www/gsh/data'
     ## put files (directories need to exist)
