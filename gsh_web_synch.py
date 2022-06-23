@@ -15,7 +15,7 @@ def upload(fnames, mkdirs=False):
     password = fernet.decrypt( st.secrets['encode'].encode() ).decode()
     ssh = SSHClient()
     ssh.load_system_host_keys()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.set_missing_host_key_policy(AutoAddPolicy())
     ssh.connect('lxplus.cern.ch',username=st.secrets['user'], password=password)
     remote = '/eos/user/m/mkenzie/www/gsh/data'
     ## put files (directories need to exist)
