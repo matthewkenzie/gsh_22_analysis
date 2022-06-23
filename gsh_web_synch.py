@@ -3,7 +3,6 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from paramiko import SSHClient
-from scp import SCPClient
 from cryptography.fernet import Fernet
 from data_analysis import plot_hist, plot_pie_chart
 from gsh_web_app import read_data, getfname
