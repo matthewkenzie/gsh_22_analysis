@@ -7,8 +7,9 @@ from cryptography.fernet import Fernet
 from data_analysis import plot_hist, plot_pie_chart
 from gsh_web_app import read_data, getfname
 import time
+from argparse import ArgumentParser
 
-def upload(fnames, mkdirs=False):
+def upload(fnames, mkdirs=False, prog=True):
 
     key = st.secrets['key']
     fernet = Fernet(key.encode())
@@ -20,8 +21,15 @@ def upload(fnames, mkdirs=False):
     remote = '/eos/user/m/mkenzie/www/gsh/data'
     ## put files (directories need to exist)
     sftp = ssh.open_sftp()
-    for fname in fnames:
+    if prog:
+        bar = st.progress(0.)
+        tot = len(fnames)
+    for i, fname in enumerate(fnames):
         sftp.put(fname, f'{remote}/{fname}')
+        if prog:
+            bar.progress( i/tot )
+    if prog:
+        bar.progress(1.)
     sftp.close()
     ssh.close()
 
@@ -49,7 +57,7 @@ def save_pie(df, variable, filters=None, upload=False):
         upload(pname)
     return pname
 
-def make_charts(df):
+def make_charts(df, tot=None):
     out_df = pd.DataFrame( columns=['Player','Course','Variable','Chart','Image'] )
     head_url = 'https://mkenzie.web.cern.ch/mkenzie/gsh/data/'
     upload_fs = []
@@ -58,6 +66,10 @@ def make_charts(df):
     courses = ['Any'] + list(pd.unique( df['Course'] ) )
     variables = ['Gross Score','Net Score','Gross Shots','Net Shots', 'Points','Player']
     splits = ['None','Player','Round']
+
+    if tot is not None:
+        prog = st.progress(0)
+        ncomp = 0
 
     # loop players
     for player in players:
@@ -80,6 +92,10 @@ def make_charts(df):
                     if split == 'None':
                         hname = save_hist(df, variable, filters=filters, split=None, stacked=False, legend=False)
                         out_df = out_df.append( {**row, **{'Chart': 'Histogram', 'Image': head_url+hname} }, ignore_index=True )
+                        upload_fs.append(hname)
+                        if tot is not None:
+                            ncomp += 1
+                            prog.progress( ncomp/tot )
                     else:
                         if split == 'Player' and player != 'All':
                             continue
@@ -92,25 +108,42 @@ def make_charts(df):
                         hname = save_hist(df, variable, filters=filters, split=split, stacked=False, legend=True)
                         out_df = out_df.append( {**row, **{'Chart': f'Histogram by {split}', 'Image': head_url+hname}}, ignore_index=True )
                         upload_fs.append(hname)
+                        if tot is not None:
+                            ncomp += 1
+                            prog.progress( ncomp/tot )
                         # stacked
                         hname = save_hist(df, variable, filters=filters, split=split, stacked=True, legend=True)
                         out_df = out_df.append( {**row, **{'Chart': f'Stacked Histogram by {split}', 'Image': head_url+hname}}, ignore_index=True )
                         upload_fs.append(hname)
+                        if tot is not None:
+                            ncomp += 1
+                            prog.progress( ncomp/tot )
                 # then pie charts
                 if variable != 'Player':
                     pname = save_pie(df, variable, filters=filters)
                     out_df = out_df.append( {**row, **{'Chart': 'Pie Chart', 'Image': head_url+pname}}, ignore_index=True )
                     upload_fs.append(pname)
+                    if tot is not None:
+                        ncomp += 1
+                        prog.progress( ncomp/tot )
 
                 if player == 'All' and variable == 'Player':
                     for score in ['Blob','Eagle','Birdie','Par','Bogey','Double Bogey','Triple Bogey']:
-                        filters['Gross Score'] = [ score ]
-                        pname = save_pie(df, variable, filters=filters)
+                        spec_filters = { **filters, **{'Gross Score': [score] } }
+                        pname = save_pie(df, variable, filters=spec_filters)
                         out_df = out_df.append( {**row, **{'Chart': f'Pie Chart {score}s', 'Image': head_url+pname}}, ignore_index=True )
                         upload_fs.append(pname)
+                        if tot is not None:
+                            ncomp += 1
+                            prog.progress( ncomp/tot )
 
+    if tot is not None:
+        prog.progress( 1. )
 
+    assert( len(out_df) == len(upload_fs) )
     os.system('mkdir -p csv')
+    out_df['Player'].replace( { 'All': '- Summary of All Players -' }, inplace=True )
+    out_df['Course'].replace( { 'Any': '- Any Course -' }, inplace=True )
     out_df.to_csv( 'csv/AppAnalysis.csv' )
 
     return out_df, upload_fs
@@ -123,9 +156,26 @@ def unique_dirs(upload_fs):
     return unique
 
 if __name__ == '__main__':
-    st.title('GASH Cup 2022 Data Synch')
 
-    synchtime = 5
+    parser = ArgumentParser()
+    parser.add_argument('-N','--no-upload', dest='noupload', default=False, action='store_true', help='Do not run the upload')
+    parser.add_argument('-t','--synch-time', dest='synchtime', default='5', help='Re-synch time')
+    args = parser.parse_args()
+
+    try:
+        synchtime = int(args.synchtime)
+    except:
+        synchtime = None
+
+    st.set_page_config( page_title='GASH Cup 2022 Data Synch',
+                        page_icon='gsh-logo.jpg' )
+
+    c1, c2 = st.columns([6,1])
+    with c1:
+        st.title('GASH Cup 2022 Data Synch')
+    with c2:
+        st.image('gsh-logo.jpg', width=100)
+
     st.text(f'Data is synched every {synchtime} minutes')
 
     run = True
@@ -134,16 +184,22 @@ if __name__ == '__main__':
         df = read_data()
         st.write('Downloading data... done')
         st.write('Making charts...')
-        out_df, upload_fs = make_charts(df)
+        out_df, upload_fs = make_charts(df, tot=491)
         st.write('Making charts... done')
-        st.write('Uploading...')
+
         with open('dirlist.txt','w') as f:
             for uniq in unique_dirs(upload_fs):
                 f.write(uniq+'\n')
-        upload( upload_fs, mkdirs=False )
-        st.write('Uploading... Done.')
+
+        if not args.noupload:
+            st.write('Uploading...')
+            upload( upload_fs, mkdirs=False, prog=True )
+            st.write('Uploading... Done.')
         st.write( out_df )
-        st.write('Waiting for next synch')
-        print('Waiting')
-        run = False
-        time.sleep(synchtime*60)
+        st.balloons()
+        if synchtime is None:
+            run = False
+        else:
+            st.write('Waiting for next synch')
+            print('Waiting')
+            time.sleep(synchtime*60)

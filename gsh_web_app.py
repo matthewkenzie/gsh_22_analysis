@@ -65,7 +65,14 @@ def getfname( chart, var, filters=None, split=None ):
 
 if __name__ == '__main__':
 
-    st.title('GASH Cup 2022 Data Analysis')
+    st.set_page_config( page_title='GASH Cup 2022 Data Analysis',
+                        page_icon='gsh-logo.jpg' )
+
+    c1, c2 = st.columns([6,1])
+    with c1:
+        st.title('GASH Cup 2022 Data Analysis')
+    with c2:
+        st.image('gsh-logo.jpg', width=100)
 
     #data_load_state = st.text('Loading data...       (hit R to refresh)')
     st.text('Data is cached for performance (hit R to refresh)')
@@ -137,7 +144,7 @@ if __name__ == '__main__':
         fig = plot_pie_chart(df, col_option, filters=filters)
 
     fname = getfname(chart_option, col_option, filters=filters, split=split_by)
-    st.write(fname)
+    #st.write(fname)
     #fig.savefig(fname)
     #upload(fname)
 

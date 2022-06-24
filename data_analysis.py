@@ -83,13 +83,13 @@ def plot_hist(df, column, filters=None, split=None, stacked=False, legend=True, 
 
             vals = [ np.vectorize(map_dict.get)(data[ data[split]==label ][column].values) for label in labels]
 
+    if len(xlabels)>0:
+        ax.hist( vals, bins=len(xlabels), range=(0,len(xlabels)), label=labels, rwidth=rwidth, stacked=stacked )
 
-    ax.hist( vals, bins=len(xlabels), range=(0,len(xlabels)), label=labels, rwidth=rwidth, stacked=stacked )
+        ax.set_xticks(np.arange(len(xlabels))+0.5)
 
-    ax.set_xticks(np.arange(len(xlabels))+0.5)
-
-    xlabels = [ str(xlabel).replace(' ','\n') for xlabel in xlabels ]
-    ax.set_xticklabels(xlabels)
+        xlabels = [ str(xlabel).replace(' ','\n') for xlabel in xlabels ]
+        ax.set_xticklabels(xlabels)
 
     if labels is not None and legend:
         ax.legend(title=split)
@@ -127,7 +127,9 @@ def plot_pie_chart(df, column, filters=None, split=None, ax=None):
         ax = plt.gca()
 
     vals = data[column].values
+    #print('Raw vals', vals)
     vals, xlabels, map_dict = data_mapping(vals)
+    #print('Pie vals', vals, xlabels)
 
     if split is None:
         vals = [ vals ]
@@ -138,19 +140,19 @@ def plot_pie_chart(df, column, filters=None, split=None, ax=None):
 
             vals = [ np.vectorize(map_dict.get)(data[ data[split]==label ][column].values) for label in labels]
 
-    nval = len(vals)
-    size = 1./nval
-    #radii = np.linspace(0,1,nval+1)[1:]
-    #for rad, val in zip(radii,vals):
-    for i, val in enumerate(vals):
-        nh, xe = np.histogram( val, bins=len(xlabels), range=(0,len(xlabels)) )
-        mask = nh!=0
-        nh = nh[mask]
-        xlabels = np.array(xlabels)[mask]
-        xlabels = [ f'{xlabel} ({val})' for xlabel, val in zip(xlabels, nh) ]
-        wedges, texts, pcts = ax.pie(nh, labels=xlabels, autopct='%1.1f%%', wedgeprops=dict(width=size, edgecolor='w'))
-        for wedge, text in zip(wedges,texts):
-            text.set_color( wedge.get_facecolor() )
+    if len(xlabels)>0:
+        nval = len(vals)
+        size = 1./nval
+
+        for i, val in enumerate(vals):
+            nh, xe = np.histogram( val, bins=len(xlabels), range=(0,len(xlabels)) )
+            mask = nh!=0
+            nh = nh[mask]
+            xlabels = np.array(xlabels)[mask]
+            xlabels = [ f'{xlabel} ({val})' for xlabel, val in zip(xlabels, nh) ]
+            wedges, texts, pcts = ax.pie(nh, labels=xlabels, autopct='%1.1f%%', wedgeprops=dict(width=size, edgecolor='w'))
+            for wedge, text in zip(wedges,texts):
+                text.set_color( wedge.get_facecolor() )
 
     column = column.replace('Points','Stableford Points')
     ax.set_title(column)
