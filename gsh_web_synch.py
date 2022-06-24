@@ -9,7 +9,7 @@ from gsh_web_app import read_data, getfname
 import time
 from argparse import ArgumentParser
 
-def upload(fnames, mkdirs=False, prog=True):
+def upload(fnames, mkdirs=False, prog=True, stream=st):
 
     key = st.secrets['key']
     fernet = Fernet(key.encode())
@@ -22,7 +22,7 @@ def upload(fnames, mkdirs=False, prog=True):
     ## put files (directories need to exist)
     sftp = ssh.open_sftp()
     if prog:
-        bar = st.progress(0.)
+        bar = stream.progress(0.)
         tot = len(fnames)
     for i, fname in enumerate(fnames):
         sftp.put(fname, f'{remote}/{fname}')
@@ -57,18 +57,21 @@ def save_pie(df, variable, filters=None, upload=False):
         upload(pname)
     return pname
 
-def make_charts(df, tot=None):
+def make_charts(df, tot=None, stream=st):
     out_df = pd.DataFrame( columns=['Player','Course','Variable','Chart','Image'] )
     head_url = 'https://mkenzie.web.cern.ch/mkenzie/gsh/data/'
     upload_fs = []
 
-    players = ['All'] + list(pd.unique( df['Player'] ) )
-    courses = ['Any'] + list(pd.unique( df['Course'] ) )
+    #players = ['All'] + list(pd.unique( df['Player'] ) )
+    #courses = ['Any'] + list(pd.unique( df['Course'] ) )
+    # need these so it makes blank charts when no scores have been added
+    players = ['All', 'Adam Hunter', 'AJ Paul', 'Alex Moffatt', 'Chris Rogers', 'Dan Bruton', 'Elliott Grigg', 'Matt Kenzie', 'Rob Campain', 'Stu Treasure', 'Will Cherry']
+    courses = ['Any','Constable', 'Gainsborough']
     variables = ['Gross Score','Net Score','Gross Shots','Net Shots', 'Points','Player']
     splits = ['None','Player','Round']
 
     if tot is not None:
-        prog = st.progress(0)
+        prog = stream.progress(0)
         ncomp = 0
 
     # loop players
@@ -91,7 +94,7 @@ def make_charts(df, tot=None):
                         continue
                     if split == 'None':
                         hname = save_hist(df, variable, filters=filters, split=None, stacked=False, legend=False)
-                        out_df = out_df.append( {**row, **{'Chart': 'Histogram', 'Image': head_url+hname} }, ignore_index=True )
+                        out_df = out_df.append( {**row, **{'Chart': 'Histogram', 'Image': head_url+hname+'?v=2'} }, ignore_index=True )
                         upload_fs.append(hname)
                         if tot is not None:
                             ncomp += 1
@@ -106,14 +109,14 @@ def make_charts(df, tot=None):
 
                         # not stacked
                         hname = save_hist(df, variable, filters=filters, split=split, stacked=False, legend=True)
-                        out_df = out_df.append( {**row, **{'Chart': f'Histogram by {split}', 'Image': head_url+hname}}, ignore_index=True )
+                        out_df = out_df.append( {**row, **{'Chart': f'Histogram by {split}', 'Image': head_url+hname+'?v=2'}}, ignore_index=True )
                         upload_fs.append(hname)
                         if tot is not None:
                             ncomp += 1
                             prog.progress( ncomp/tot )
                         # stacked
                         hname = save_hist(df, variable, filters=filters, split=split, stacked=True, legend=True)
-                        out_df = out_df.append( {**row, **{'Chart': f'Stacked Histogram by {split}', 'Image': head_url+hname}}, ignore_index=True )
+                        out_df = out_df.append( {**row, **{'Chart': f'Stacked Histogram by {split}', 'Image': head_url+hname+'?v=2'}}, ignore_index=True )
                         upload_fs.append(hname)
                         if tot is not None:
                             ncomp += 1
@@ -121,7 +124,7 @@ def make_charts(df, tot=None):
                 # then pie charts
                 if variable != 'Player':
                     pname = save_pie(df, variable, filters=filters)
-                    out_df = out_df.append( {**row, **{'Chart': 'Pie Chart', 'Image': head_url+pname}}, ignore_index=True )
+                    out_df = out_df.append( {**row, **{'Chart': 'Pie Chart', 'Image': head_url+pname+'?v=2'}}, ignore_index=True )
                     upload_fs.append(pname)
                     if tot is not None:
                         ncomp += 1
@@ -131,7 +134,7 @@ def make_charts(df, tot=None):
                     for score in ['Blob','Eagle','Birdie','Par','Bogey','Double Bogey','Triple Bogey']:
                         spec_filters = { **filters, **{'Gross Score': [score] } }
                         pname = save_pie(df, variable, filters=spec_filters)
-                        out_df = out_df.append( {**row, **{'Chart': f'Pie Chart {score}s', 'Image': head_url+pname}}, ignore_index=True )
+                        out_df = out_df.append( {**row, **{'Chart': f'Pie Chart {score}s', 'Image': head_url+pname+'?v=2'}}, ignore_index=True )
                         upload_fs.append(pname)
                         if tot is not None:
                             ncomp += 1
@@ -178,28 +181,57 @@ if __name__ == '__main__':
 
     st.text(f'Data is synched every {synchtime} minutes')
 
+    statusholder = st.empty()
+
+    lastupdate = None
     run = True
     while run:
-        st.write('Downloading data...')
+        if lastupdate is None:
+            statusholder.text('Waiting for first synch...')
+        else:
+            statusholder.success(f'Last synched on {lastupdate}')
+
+        #with pageholder.container():
+        data_status = st.empty()
+        data_status.text('Downloading data...')
         df = read_data()
-        st.write('Downloading data... done')
-        st.write('Making charts...')
-        out_df, upload_fs = make_charts(df, tot=491)
-        st.write('Making charts... done')
+        data_status.text('Downloading data... done')
+
+        chart_status = st.empty()
+        chart_status.text('Making charts...')
+        chart_prog_bar = st.empty()
+        out_df, upload_fs = make_charts(df, tot=491, stream=chart_prog_bar)
+        chart_status.text('Making charts... done')
 
         with open('dirlist.txt','w') as f:
             for uniq in unique_dirs(upload_fs):
                 f.write(uniq+'\n')
 
         if not args.noupload:
-            st.write('Uploading...')
-            upload( upload_fs, mkdirs=False, prog=True )
-            st.write('Uploading... Done.')
-        st.write( out_df )
+            upload_status = st.empty()
+            upload_status.text('Uploading...')
+            upload_prog_bar = st.empty()
+            upload( upload_fs, mkdirs=False, prog=True, stream=upload_prog_bar )
+            upload_status.text('Uploading... Done.')
+
+        df_status = st.empty()
+        with df_status.container():
+            st.text('Synched data:')
+            st.write( out_df )
+
+        lastupdate = time.strftime("%d/%m/%y - %H:%M:%S")
         st.balloons()
         if synchtime is None:
             run = False
         else:
-            st.write('Waiting for next synch')
-            print('Waiting')
-            time.sleep(synchtime*60)
+            with statusholder.container():
+                st.success(f'Last synched on {lastupdate}')
+                with st.spinner('Waiting for next synch...'):
+                    time.sleep(synchtime*60)
+            data_status.empty()
+            chart_status.empty()
+            chart_prog_bar.empty()
+            if not args.noupload:
+                upload_status.empty()
+                upload_prog_bar.empty()
+            df_status.empty()
