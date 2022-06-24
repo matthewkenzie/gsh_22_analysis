@@ -7,7 +7,7 @@ from cryptography.fernet import Fernet
 
 link = st.secrets['url']
 
-@st.cache
+@st.cache(ttl=60)
 def read_data(drop_nan=True):
 
     df = pd.read_csv(link)
@@ -17,7 +17,7 @@ def read_data(drop_nan=True):
 
     return df
 
-@st.cache
+@st.cache(ttl=60)
 def sum_data(df):
     players = pd.unique( df['Player'] )
     sum_df = pd.DataFrame( columns=['Player','Holes Played', 'Total Points'] )
