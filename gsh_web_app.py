@@ -68,11 +68,7 @@ if __name__ == '__main__':
     st.set_page_config( page_title='GASH Cup 2022 Data Analysis',
                         page_icon='gsh-logo.jpg' )
 
-    c1, c2 = st.columns([6,1])
-    with c1:
-        st.title('GASH Cup 2022 Data Analysis')
-    with c2:
-        st.image('gsh-logo.jpg', width=100)
+    st.title('GASH Cup 2022 Data Analysis')
 
     #data_load_state = st.text('Loading data...       (hit R to refresh)')
     st.text('Data is cached for performance (hit R to refresh)')
