@@ -1,31 +1,45 @@
 import os
+import time
 import streamlit as st
 import pandas as pd
 import numpy as np
+import gspread
 from data_analysis import plot_hist, plot_pie_chart
 from cryptography.fernet import Fernet
 
-link = st.secrets['url']
+gs_creds = st.secrets['credentials']
+gs_skey  = st.secrets['skey']
+gs_gc    = gspread.service_account_from_dict(gs_creds)
+link     = st.secrets['url']
 
+#@st.cache(ttl=60)
 @st.cache(ttl=60)
 def read_data(drop_nan=True):
 
-    df = pd.read_csv(link)
+    sh = gs_gc.open_by_key( gs_skey )
+    ws = sh.worksheet('AppData')
+    df = pd.DataFrame(ws.get_all_records())
+    df = df.astype( {'Gross Shots': str , 'Net Shots': str } )
 
     if drop_nan:
+        df.replace('',np.nan,inplace=True)
         df = df.dropna()
 
     return df
 
-@st.cache(ttl=60)
-def sum_data(df):
-    players = pd.unique( df['Player'] )
-    sum_df = pd.DataFrame( columns=['Player','Holes Played', 'Total Points'] )
-    for player in players:
-        played = len( df[ df['Player']==player ] )
-        points = df[ df['Player']==player ]['Points'].sum()
-        sum_df = sum_df.append( { 'Player' : player, 'Holes Played': played, 'Total Points': points }, ignore_index=True )
-    return sum_df
+def write_data(df, wsname, vtag=None):
+
+    if vtag is not None:
+        if type(vtag)==bool and vtag:
+            vtag = int(time.time())
+        df = df.replace('.png',f'.png?v={vtag}',regex=True)
+
+    sh = gs_gc.open_by_key( gs_skey )
+    if wsname not in [ w.title for w in sh.worksheets() ]:
+        sh.add_worksheet(title=wsname, rows=len(df), cols=len(df.columns))
+
+    ws = sh.worksheet(wsname)
+    ws.update( [df.columns.values.tolist()] + df.values.tolist() )
 
 def getfname( chart, var, filters=None, split=None ):
     chart_map = { 'Histogram': 'hist', 'Pie Chart': 'pie' }

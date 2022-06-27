@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from paramiko import SSHClient, AutoAddPolicy
 from cryptography.fernet import Fernet
 from data_analysis import plot_hist, plot_pie_chart
-from gsh_web_app import read_data, getfname
+from gsh_web_app import read_data, getfname, write_data
 import time
 from argparse import ArgumentParser
 
@@ -94,7 +94,7 @@ def make_charts(df, tot=None, stream=st):
                         continue
                     if split == 'None':
                         hname = save_hist(df, variable, filters=filters, split=None, stacked=False, legend=False)
-                        out_df = out_df.append( {**row, **{'Chart': 'Histogram', 'Image': head_url+hname+'?v=2'} }, ignore_index=True )
+                        out_df = out_df.append( {**row, **{'Chart': 'Histogram', 'Image': head_url+hname} }, ignore_index=True )
                         upload_fs.append(hname)
                         if tot is not None:
                             ncomp += 1
@@ -109,14 +109,14 @@ def make_charts(df, tot=None, stream=st):
 
                         # not stacked
                         hname = save_hist(df, variable, filters=filters, split=split, stacked=False, legend=True)
-                        out_df = out_df.append( {**row, **{'Chart': f'Histogram by {split}', 'Image': head_url+hname+'?v=2'}}, ignore_index=True )
+                        out_df = out_df.append( {**row, **{'Chart': f'Histogram by {split}', 'Image': head_url+hname}}, ignore_index=True )
                         upload_fs.append(hname)
                         if tot is not None:
                             ncomp += 1
                             prog.progress( ncomp/tot )
                         # stacked
                         hname = save_hist(df, variable, filters=filters, split=split, stacked=True, legend=True)
-                        out_df = out_df.append( {**row, **{'Chart': f'Stacked Histogram by {split}', 'Image': head_url+hname+'?v=2'}}, ignore_index=True )
+                        out_df = out_df.append( {**row, **{'Chart': f'Stacked Histogram by {split}', 'Image': head_url+hname}}, ignore_index=True )
                         upload_fs.append(hname)
                         if tot is not None:
                             ncomp += 1
@@ -124,7 +124,7 @@ def make_charts(df, tot=None, stream=st):
                 # then pie charts
                 if variable != 'Player':
                     pname = save_pie(df, variable, filters=filters)
-                    out_df = out_df.append( {**row, **{'Chart': 'Pie Chart', 'Image': head_url+pname+'?v=2'}}, ignore_index=True )
+                    out_df = out_df.append( {**row, **{'Chart': 'Pie Chart', 'Image': head_url+pname}}, ignore_index=True )
                     upload_fs.append(pname)
                     if tot is not None:
                         ncomp += 1
@@ -134,7 +134,7 @@ def make_charts(df, tot=None, stream=st):
                     for score in ['Blob','Eagle','Birdie','Par','Bogey','Double Bogey','Triple Bogey']:
                         spec_filters = { **filters, **{'Gross Score': [score] } }
                         pname = save_pie(df, variable, filters=spec_filters)
-                        out_df = out_df.append( {**row, **{'Chart': f'Pie Chart {score}s', 'Image': head_url+pname+'?v=2'}}, ignore_index=True )
+                        out_df = out_df.append( {**row, **{'Chart': f'Pie Chart {score}s', 'Image': head_url+pname}}, ignore_index=True )
                         upload_fs.append(pname)
                         if tot is not None:
                             ncomp += 1
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     with c2:
         st.image('gsh-logo.jpg', width=100)
 
-    st.text(f'Data is synched every {synchtime} minutes')
+    st.write(f'Data is synched every {synchtime} minutes')
 
     statusholder = st.empty()
 
@@ -187,21 +187,20 @@ if __name__ == '__main__':
     run = True
     while run:
         if lastupdate is None:
-            statusholder.text('Waiting for first synch...')
+            statusholder.write('Waiting for first synch...')
         else:
             statusholder.success(f'Last synched on {lastupdate}')
 
-        #with pageholder.container():
         data_status = st.empty()
-        data_status.text('Downloading data...')
+        data_status.write('1/4: Downloading data...')
         df = read_data()
-        data_status.text('Downloading data... done')
+        data_status.write('1/4: Downloading data... done :white_check_mark:')
 
         chart_status = st.empty()
-        chart_status.text('Making charts...')
+        chart_status.write('2/4: Making charts...')
         chart_prog_bar = st.empty()
         out_df, upload_fs = make_charts(df, tot=491, stream=chart_prog_bar)
-        chart_status.text('Making charts... done')
+        chart_status.write('2/4: Making charts... done :white_check_mark:')
 
         with open('dirlist.txt','w') as f:
             for uniq in unique_dirs(upload_fs):
@@ -209,14 +208,19 @@ if __name__ == '__main__':
 
         if not args.noupload:
             upload_status = st.empty()
-            upload_status.text('Uploading...')
+            upload_status.write('3/4: Uploading...')
             upload_prog_bar = st.empty()
             upload( upload_fs, mkdirs=False, prog=True, stream=upload_prog_bar )
-            upload_status.text('Uploading... Done.')
+            upload_status.write('3/4: Uploading... done :white_check_mark:')
+
+            write_status = st.empty()
+            write_status.write('4/4: Writing back to gsheet...')
+            write_data(out_df, 'AppAnalysis', vtag=True)
+            write_status.write('4/4: Writing back to gsheet... done :white_check_mark:')
 
         df_status = st.empty()
         with df_status.container():
-            st.text('Synched data:')
+            st.write('Synched data:')
             st.write( out_df )
 
         lastupdate = time.strftime("%d/%m/%y - %H:%M:%S")
@@ -234,4 +238,5 @@ if __name__ == '__main__':
             if not args.noupload:
                 upload_status.empty()
                 upload_prog_bar.empty()
+                write_status.empty()
             df_status.empty()
